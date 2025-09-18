@@ -1,0 +1,281 @@
+
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: FluentBit
+metadata:
+  name: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+spec:
+  # image: kubesphere/fluent-bit:v1.8.11 # <--- this was the fucking problem!!!
+  positionDB:
+    hostPath:
+      path: /var/lib/fluent-bit/
+  resources:
+    requests:
+      cpu: 10m
+      memory: 25Mi
+    limits:
+      cpu: 500m
+      memory: 200Mi
+  fluentBitConfigName: fluent-bit-config
+  namespaceFluentBitCfgSelector: 
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  tolerations:
+    - operator: Exists
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterInput
+metadata:
+  name: tail
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  tail:
+    tag: kube.*
+    path: /var/log/containers/*.log
+    # More excludes to consider: 
+    # Exclude_Path /var/log/containers/*_kube-system_*,/var/log/containers/*_keda_*,/var/log/containers/*_amazon-cloudwatch_*
+    excludePath: /var/log/containers/*default_fluent-bit*       # Exclude fluent-bit logs (maybe remove this after?)
+    multilineParser: docker, cri
+    db: /fluent-bit/tail/pos.db
+    dbSync: Normal
+    memBufLimit: 256MB
+    # replaceDots: true   # unknown field
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterInput
+metadata:
+  name: kubelet-systemd
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  systemd:
+    tag: service.kubelet
+    path: /var/log/journal
+    db: /fluent-bit/tail/kubelet.db
+    dbSync: Normal
+    systemdFilter:
+      - _SYSTEMD_UNIT=kubelet.service
+      - _SYSTEMD_UNIT=docker.service
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterFilter
+metadata:
+  name: kubeletfilter
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  match: kube.*
+  filters:
+    - kubernetes:
+        kubeURL: https://kubernetes.default.svc:443
+        kubeCAFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        kubeTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+        labels: true
+        annotations: true
+    # - modify:
+    #     rules:
+    #       - rename:
+    #           message: content
+    #           log: content
+    - nest: 
+        operation: lift
+        nestedUnder: kubernetes
+        addPrefix: k8s_
+    # - nest: 
+    #     operation: lift
+    #     nestedUnder: k8s_labels
+    #     addPrefix: k8s_label_
+    # - nest: 
+    #     operation: lift
+    #     nestedUnder: k8s_annotations
+    #     addPrefix: k8s_annotation_
+    - modify:
+        rules: 
+          - remove: k8s_container_hash
+          - remove: k8s_annotations_checksum_config
+    #       # - remove: k8s_docker_id
+    #       - rename: 
+    #           date: timestamp
+              # k8s_pod_name: k8s.pod.name
+              # k8s_namespace_name: k8s.namespace.name
+              # k8s_pod_id: k8s.pod.uid
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterOutput
+metadata:
+  name: fluent-bit-k8s-app-loki
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  # matchRegex: (?:kube|service)\.(.*)
+  match: kube.*
+  loki: 
+    host: loki-gateway.default.svc.cluster.local
+    port: 80
+    labels: 
+      - service=fluentbit
+      - job=tail
+      - namespace=$k8s_namespace_name
+    autoKubernetesLabels: 'on'
+    lineFormat: json
+    # labelKeys:
+    # labelMapPath: /fluent-bit/etc/conf/logmap.json
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterOutput
+metadata:
+  name: fluent-bit-k8s-service-kubelet-loki
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  match: service.kubelet
+  loki: 
+    host: loki-gateway.default.svc.cluster.local
+    port: 80
+    labels: 
+      - service=fluentbit
+      - job=systemd
+    autoKubernetesLabels: 'on'
+    lineFormat: json
+    # labels:
+    # labelKeys:
+    # labelMapPath: /fluent-bit/etc/conf/logmap.json
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: FluentBitConfig
+metadata:
+  name: fluent-bit-namespaced-config
+  namespace: demo-5
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  service:
+    parsersFile: parsers.conf
+  clusterParserSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  filterSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  outputSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: Filter
+metadata: 
+  name: namespaced-kubeletfilter
+  namespace: demo-5
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec: 
+  match: kube.*
+  # matchRegex: blaaa     # try match  
+  filters:
+    - rewriteTag: 
+        rules: 
+          - $k8s_namespace_name ^(.*)$ from.$TAG.new.$k8s_namespace_name.out true
+        emitterName: re_emitted
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: Output
+metadata:
+  name: fluent-bit-namespaced-output-loki
+  namespace: demo-5
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  # matchRegex: (?:kube|service).(.*).(_demo-5_).(.*)
+  # match: kube.*
+  match: from.*
+  loki: 
+    host: loki-gateway.default.svc.cluster.local
+    port: 80
+    labels: 
+      - service=fluentbit-namespaced
+      - job=tail-namespaced
+      - workshop=demo-5-namespaced
+    autoKubernetesLabels: 'on'
+    lineFormat: json
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: Output
+metadata:
+  name: fluent-bit-namespaced-output-opensearch
+  namespace: demo-5
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  match: from.*
+  opensearch: 
+    host: opensearch-node.demo-5.svc.cluster.local
+    port: 9200
+    index: logs
+    replaceDots: true
+    tls:
+      verify: false
+    httpUser: 
+      valueFrom: 
+        secretKeyRef: 
+          name: opensearch-user
+          key: httpUser
+    httpPassword: 
+      valueFrom: 
+        secretKeyRef: 
+          name: opensearch-user
+          key: httpPassword
+    suppressTypeName: true
+---
+# apiVersion: fluentbit.fluent.io/v1alpha2
+# kind: ClusterOutput
+# metadata:
+#   name: fluent-bit-loki-kub
+#   labels:
+#     fluentbit.fluent.io/enabled: "true"
+#     fluentbit.fluent.io/component: logging
+# spec:
+#   # matchRegex: (?:kube|service)\.(.*)
+#   match: kube.*
+#   loki: 
+#     # format: json_stream
+#     labels: agent=fluent-bit
+#     label_map_path: /fluent-bit/etc/conf/logmap.json
+# ---
+# apiVersion: fluentbit.fluent.io/v1alpha2
+# kind: ClusterOutput
+# metadata:
+#   name: fluent-bit-stdout-kubelet
+#   labels:
+#     fluentbit.fluent.io/enabled: "true"
+#     fluentbit.fluent.io/component: logging
+# spec:
+#   # matchRegex: (?:kube|service)\.(.*)
+#   match: service.kubelet
+#   loki: 
+#     # format: json_stream
+#     labels: agent=fluent-bit
+#     label_map_path: /fluent-bit/etc/conf/logmap.json
+# ---
+# apiVersion: fluentbit.fluent.io/v1alpha2
+# kind: ClusterOutput
+# metadata:
+#   name: fluent-bit-stdout
+#   labels:
+#     fluentbit.fluent.io/enabled: "true"
+#     fluentbit.fluent.io/component: logging
+# spec:
+#   match: kube.*
+#   stdout: 
+#     format: json
+#     jsonDateFormat: iso8601
+#     jsonDateKey: timestamp

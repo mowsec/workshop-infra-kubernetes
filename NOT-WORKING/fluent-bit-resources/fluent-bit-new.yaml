@@ -1,0 +1,175 @@
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterInput
+metadata:
+  name: tail
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  tail:
+    tag: kube.*
+    path: /var/log/containers/*.log
+    # More excludes to consider: 
+    # Exclude_Path /var/log/containers/*_kube-system_*,/var/log/containers/*_keda_*,/var/log/containers/*_amazon-cloudwatch_*
+    # excludePath: /var/log/containers/*default_fluent-bit*       # Exclude fluent-bit logs (maybe remove this after?)
+    parser: docker, cri
+    db: /fluent-bit/tail/pos.db
+    dbSync: Normal
+    memBufLimit: 256MB
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterOutput
+metadata:
+  name: fluent-bit-k8s-app-loki
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  # matchRegex: (?:kube|service)\.(.*)
+  match: kube.*
+  loki: 
+    host: loki-gateway.default.svc.cluster.local
+    port: 80
+    labels: 
+      - service=fluentbit
+      - job=tail
+      - namespace=$kubernetes['namespace_name']
+    autoKubernetesLabels: 'on'
+    lineFormat: json
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: FluentBitConfig
+metadata:
+  name: fluent-bit-namespaced-config
+  namespace: demo-5
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  service:
+    parsersFile: parsers.conf
+  clusterParserSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  clusterMultilineParserSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  multilineParserSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  parserSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  filterSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  outputSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: Output
+metadata:
+  name: fluent-bit-namespaced-output-loki
+  namespace: demo-5
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  # matchRegex: (?:kube|service).(.*).(_demo-5_).(.*)
+  match: kube.*
+  # match: from.*
+  loki: 
+    host: loki-gateway.default.svc.cluster.local
+    port: 80
+    labels: 
+      - service=fluentbit-namespaced
+      - job=tail-namespaced
+      - workshop=demo-5-namespaced
+      - namespace=$kubernetes['namespace_name']
+    # autoKubernetesLabels: 'on'
+    lineFormat: json
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterFilter
+metadata:
+  name: multiline
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  match: kube.*
+  filters:
+    parsers: 
+      - docker
+      - cri
+---
+#TODO: TRY TO ADD A FILTER THAT MOVES THE LOG DATA UP ONE LEVEL
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: Filter
+metadata:
+  name: fluent-bit-namespaced-output-opensearch-filter
+  namespace: demo-5
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  match: kube.*
+  filters: 
+  - nest:
+      operation: lift
+      nestedUnder: log_processed
+      addPrefix: log_
+      wildcard: 
+        - message
+  - parser:
+      keyName: log_message
+      parser: docker, cri
+      preserveKey: On
+      reserveData: On
+      # unescapeKey: true.  <-- maybe try this?
+
+  #   [FILTER]
+  #       Name               nest
+  #       Match              application.*
+  #       Operation          lift
+  #       Nested_under       log_processed
+  #       Add_prefix         log_
+  #       Wildcard           message
+  #  [FILTER]
+  #      Name                parser
+  #      Match               application.*
+  #      Key_Name            log_message
+  #      Parser              docker        
+  #      Preserve_Key        On
+  #      Reserve_Data        On 
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: Output
+metadata:
+  name: fluent-bit-namespaced-output-opensearch
+  namespace: demo-5
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+    fluentbit.fluent.io/component: logging
+spec:
+  match: kube.*
+  opensearch: 
+    host: opensearch-node.demo-5.svc.cluster.local
+    # host: opensearch-node
+    port: 9200
+    index: logs
+    replaceDots: true
+    suppressTypeName: true
+    tls:
+      verify: false
+    httpUser: 
+      valueFrom: 
+        secretKeyRef: 
+          name: opensearch-user
+          key: httpUser
+    httpPassword: 
+      valueFrom: 
+        secretKeyRef: 
+          name: opensearch-user
+          key: httpPassword

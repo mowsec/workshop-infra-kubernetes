@@ -1,0 +1,9 @@
+dependencies:
+- name: contrast-agent-operator
+  repository: https://contrastsecurity.dev/helm-charts
+  version: 5.0.0
+- name: fluent-bit
+  repository: https://fluent.github.io/helm-charts
+  version: 0.49.1
+digest: sha256:99870990a88c33efdb68349b28fa45a40a417a6a735c776cc4aa7d6dc1101525
+generated: "2025-09-09T23:54:10.601516+01:00"

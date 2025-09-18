@@ -1,0 +1,121 @@
+
+# fluent-bit:
+#   config:
+#     inputs: |
+#       [INPUT]
+#           Name tail
+#           Path /var/log/containers/*.log
+#           multiline.parser docker, cri
+#           Tag kube.*
+#           Skip_Long_Lines On
+
+#     outputs: |
+#       [OUTPUT]
+#           Name  opensearch
+#           Match *
+#           Host  opensearch-node.demo-5.svc.cluster.local
+#           Port  9200
+#           Index logs
+#           Replace_Dots On
+#           tls On
+#           tls.verify Off
+#           HTTP_User admin
+#           HTTP_Passwd Contrast@123!
+#           Suppress_Type_Name On
+
+# logstash_prefix logstash
+# logstash_prefix_key $kubernetes['namespace_name']
+
+# Kinda working a bit more, properly filtered kube logs, but systemd is a problem
+# fluent-bit:
+#   image:
+#     repository: cr.fluentbit.io/fluent/fluent-bit
+#     tag: latest-debug
+#   config:
+#     inputs: |
+#       [INPUT]
+#           Name tail
+#           Path /var/log/containers/*.log
+#           Exclude_Path /var/log/containers/*default_fluent-bit*
+#           multiline.parser docker, cri
+#           Tag kube.*
+#           Skip_Long_Lines On
+#           Mem_Buf_Limit 64MB
+      
+#       [INPUT]
+#           Name systemd
+#           Tag host.*
+#           Systemd_Filter _SYSTEMD_UNIT=kubelet.service
+#           Read_From_Tail On
+#     filters : |
+#       [FILTER]
+#           Name kubernetes
+#           Match kube.*
+#           Merge_Log On
+#           Keep_Log Off
+#           K8S-Logging.Parser On
+#           K8S-Logging.Exclude On
+      
+#       [FILTER]
+#           Name rewrite_tag
+#           Match kube.*
+#           Rule $kubernetes['namespace_name'] ^(.*)$ $kubernetes['namespace_name'] false
+#     outputs: |
+#       [OUTPUT]
+#           Name  opensearch
+#           Match demo-5
+#           Host  opensearch-node.demo-5.svc.cluster.local
+#           Port  9200
+#           Index logs
+#           Replace_Dots On
+#           tls On
+#           tls.verify Off
+#           HTTP_User admin
+#           HTTP_Passwd Contrast@123!
+#           Suppress_Type_Name On
+      
+#       [OUTPUT]
+#           Name   stdout
+#           Match  demo-5
+#           # Format json
+#           # Json_date_key timestamp
+#           # Json_date_format iso8601
+
+# Kinda working -------
+# fluent-bit:
+#   config:
+#     inputs: |
+#       [INPUT]
+#           Name tail
+#           Path /var/log/containers/*_demo-5_*.log
+#           multiline.parser docker, cri
+#           Tag demo-5.kube.*
+#           DB /var/log/flb_kube_demo.db
+#           Skip_Long_Lines On
+
+#       [INPUT]
+#           Name systemd
+#           Tag demo-5.host.*
+#           Systemd_Filter _SYSTEMD_UNIT=kubelet.service
+#           Read_From_Tail On
+#     filters: |
+#       [FILTER]
+#           Name kubernetes
+#           Match kube.*
+#           Merge_Log On
+#           Keep_Log Off
+#           K8S-Logging.Parser On
+#           K8S-Logging.Exclude On
+#     outputs: |
+#       [OUTPUT]
+#           Name  opensearch
+#           Match demo-5.*
+#           Host  opensearch-node.demo-5.svc.cluster.local
+#           Port  9200
+#           Index demo-5-logs
+#           Replace_Dots On
+#           tls On
+#           tls.verify Off
+#           HTTP_User admin
+#           HTTP_Passwd Contrast@123!
+#           Suppress_Type_Name On

@@ -1,0 +1,27 @@
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterFilter
+metadata:
+  name: lift-log-level-items
+  labels:
+    fluentbit.fluent.io/component: logging
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  filters:
+#   - kubernetes:
+#       annotations: true
+#       kubeCAFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+#       kubeTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+#       kubeURL: https://kubernetes.default.svc:443
+#       labels: true
+    - parser: 
+        keyName: log
+        parser: docker
+        # format: json
+      # timeKey: timestamp
+      # timeFormat: "%Y-%m-%dT%H:%M:%S.%L"
+  # - nest:
+  #     nestedUnder: log
+  #     operation: lift
+  match: kube.*
+
+

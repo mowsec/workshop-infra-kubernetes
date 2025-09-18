@@ -1,0 +1,63 @@
+#❯ kubectl edit -n fluent fluentbits.fluentbit.fluent.io fluent-bit -o yaml --save-config
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: FluentBit
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"fluentbit.fluent.io/v1alpha2","kind":"FluentBit","metadata":{"annotations":{"meta.helm.sh/release-name":"fluent-operator","meta.helm.sh/release-namespace":"fluent"},"creationTimestamp":"2025-09-15T18:46:05Z","finalizers":["fluentbit.fluent.io"],"generation":2,"labels":{"app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"fluent-bit"},"managedFields":[{"apiVersion":"fluentbit.fluent.io/v1alpha2","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:annotations":{".":{},"f:meta.helm.sh/release-name":{},"f:meta.helm.sh/release-namespace":{}},"f:labels":{".":{},"f:app.kubernetes.io/managed-by":{},"f:app.kubernetes.io/name":{}}},"f:spec":{".":{},"f:affinity":{".":{},"f:nodeAffinity":{".":{},"f:requiredDuringSchedulingIgnoredDuringExecution":{}}},"f:fluentBitConfigName":{},"f:image":{},"f:livenessProbe":{".":{},"f:failureThreshold":{},"f:httpGet":{".":{},"f:path":{},"f:port":{}},"f:initialDelaySeconds":{},"f:periodSeconds":{},"f:successThreshold":{},"f:timeoutSeconds":{}},"f:positionDB":{".":{},"f:hostPath":{".":{},"f:path":{}}},"f:rbacRules":{},"f:resources":{".":{},"f:limits":{".":{},"f:cpu":{},"f:memory":{}},"f:requests":{".":{},"f:cpu":{},"f:memory":{}}},"f:tolerations":{}}},"manager":"helm","operation":"Update","time":"2025-09-15T18:46:05Z"},{"apiVersion":"fluentbit.fluent.io/v1alpha2","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:finalizers":{".":{},"v:\"fluentbit.fluent.io\"":{}}},"f:spec":{"f:namespaceFluentBitCfgSelector":{},"f:service":{}},"f:status":{}},"manager":"manager","operation":"Update","time":"2025-09-15T18:46:07Z"}],"name":"fluent-bit","namespace":"fluent","resourceVersion":"399653","uid":"db1f60b7-0b10-44db-b360-263b8bcfc9d3"},"spec":{"affinity":{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"node-role.kubernetes.io/edge","operator":"DoesNotExist"}]}]}}},"fluentBitConfigName":"fluent-bit-config","image":"ghcr.io/fluent/fluent-operator/fluent-bit:4.0.1","livenessProbe":{"failureThreshold":8,"httpGet":{"path":"/","port":2020},"initialDelaySeconds":10,"periodSeconds":10,"successThreshold":1,"timeoutSeconds":15},"namespaceFluentBitCfgSelector":{"matchLabels":{"fluentbit.fluent.io/enabled":"true"}},"positionDB":{"hostPath":{"path":"/var/lib/fluent-bit/"}},"rbacRules":[{"apiGroups":[""],"resources":["events"],"verbs":["list"]}],"resources":{"limits":{"cpu":"500m","memory":"200Mi"},"requests":{"cpu":"10m","memory":"25Mi"}},"service":{},"tolerations":[{"operator":"Exists"}]},"status":{}}
+    meta.helm.sh/release-name: fluent-operator
+    meta.helm.sh/release-namespace: fluent
+  creationTimestamp: "2025-09-15T18:46:05Z"
+  finalizers:
+  - fluentbit.fluent.io
+  generation: 3
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: fluent-bit
+  name: fluent-bit
+  namespace: fluent
+  resourceVersion: "415464"
+  uid: db1f60b7-0b10-44db-b360-263b8bcfc9d3
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/edge
+            operator: DoesNotExist
+  fluentBitConfigName: fluent-bit-config
+  image: ghcr.io/fluent/fluent-operator/fluent-bit:4.0.1
+  livenessProbe:
+    failureThreshold: 8
+    httpGet:
+      path: /
+      port: 2020
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 15
+  namespaceFluentBitCfgSelector:
+    matchLabels:
+      fluentbit.fluent.io/enabled: "true"
+  positionDB:
+    hostPath:
+      path: /var/lib/fluent-bit/
+  rbacRules:
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - list
+  resources:
+    limits:
+      cpu: 500m
+      memory: 200Mi
+    requests:
+      cpu: 10m
+      memory: 25Mi
+  service: {}
+  tolerations:
+  - operator: Exists
+status: {}
