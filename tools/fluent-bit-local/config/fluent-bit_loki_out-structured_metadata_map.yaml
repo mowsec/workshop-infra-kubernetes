@@ -1,0 +1,88 @@
+service:
+  log_level: debug
+
+pipeline:
+  inputs:
+    - name: dummy
+      tag: logs
+      # dummy: |
+      #   {
+      #     "message": "simple log generated",
+      #     "logger": "my.logger",
+      #     "level": "INFO",
+      #     "hostname": "localhost",
+      #     "my_map_of_attributes_1": {
+      #       "key_1": "hello, world!",
+      #       "key_2": "goodbye, world!"
+      #     },
+      #     "my_map_of_maps_1": {
+      #       "root_key": {
+      #         "sub_key_1": "hello, world!",
+      #         "sub_key_2": "goodbye, world!"
+      #       }
+      #     }
+      #   }
+      # dummy: |
+      #   2025-09-22 08:42:29,039 - __main__ - INFO - {"timestamp": "2025-09-22T08:42:29.039483+00:00", "source": "contrast-data-collector", "data_type": "collection_summary", "issues_success": true, "incidents_success": true, "collection_cycle_completed": true}
+      # dummy: |
+      #   {"timestamp": "2025-09-22T08:46:34.370778+00:00", "source": "contrast-security-api", "data_type": "incident", "log_type": "contrast-incidents", "incident_index": 0, "incident_id": "INC-2025-1257", "incident_title": "OS Command Injection from Request Body on \"/testConnection\" page", "incident_status": "open", "cvss_score": 10.0, "severity": "CRITICAL", "created_time": "2025-09-22T08:46:29.520Z", "updated_time": "2025-09-22T08:46:32.691Z", "assigned_user": null, "application_count": 1, "asset_count": 2, "full_data": {"incidentId": "INC-2025-1257", "status": "open", "incidentName": "OS Command Injection from Request Body on \"/testConnection\" page", "score": 10.0, "severity": "CRITICAL", "assignedUserName": null, "applicationCount": 1, "assetCount": 2, "createdTime": "2025-09-22T08:46:29.520Z", "updatedTime": "2025-09-22T08:46:32.691Z"}}
+      dummy: |
+        {
+          "timestamp": "2025-09-22T08:46:34.370778+00:00",
+          "source": "contrast-security-api",
+          "data_type": "incident",
+          "log_type": "contrast-incidents",
+          "incident_index": 0,
+          "incident_id": "INC-2025-1257",
+          "incident_title": "OS Command Injection from Request Body on \"/testConnection\" page",
+          "incident_status": "open",
+          "cvss_score": 10,
+          "severity": "CRITICAL",
+          "created_time": "2025-09-22T08:46:29.520Z",
+          "updated_time": "2025-09-22T08:46:32.691Z",
+          "assigned_user": null,
+          "application_count": 1,
+          "asset_count": 2,
+          "full_data": {
+            "incidentId": "INC-2025-1257",
+            "status": "open",
+            "incidentName": "OS Command Injection from Request Body on \"/testConnection\" page",
+            "score": 10,
+            "severity": "CRITICAL",
+            "assignedUserName": null,
+            "applicationCount": 1,
+            "assetCount": 2,
+            "createdTime": "2025-09-22T08:46:29.520Z",
+            "updatedTime": "2025-09-22T08:46:32.691Z"
+          }
+        }
+
+
+  outputs:
+    - name: loki
+      match: logs
+      host: loki
+      # remove_keys: hostname,my_map_of_attributes_1,my_map_of_maps_1
+      label_keys: $level,$logger
+      labels: service_name=test
+      structured_metadata: $full_data
+      # structured_metadata_map_keys: $full_data
+      line_format: json
+      # drop_single_key: on
+    
+    - name: es
+      match: logs
+      host: opensearch-node
+      port: 9200
+      index: logs
+      type: _doc
+      http_user: admin
+      http_passwd: Contrast@123!
+      tls: on
+      tls.verify: off
+      replace_dots: on
+      suppress_type_name: on
+      # logstash_format: on
+      # logstash_prefix: unknown
+      # time_key: timestamp
+      # time_key_format: "%Y-%m-%dT%H:%M:%S.%L%z"

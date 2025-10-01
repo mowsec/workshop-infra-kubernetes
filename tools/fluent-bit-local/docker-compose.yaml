@@ -1,0 +1,142 @@
+services:
+  fluentbit:
+# Comment out `image` and uncomment `build` to build the fluent-bit image from local source
+    image: fluent/fluent-bit:latest
+#    build:
+#      context: ../../
+#      dockerfile: dockerfiles/Dockerfile
+    depends_on:
+      - loki
+    container_name: fluentbit
+    command: /fluent-bit/bin/fluent-bit -c /etc/fluent-bit_loki_out-structured_metadata_map.yaml
+    ports:
+      - 2021:2021
+    networks:
+      - logging-network
+    volumes:
+      - ./config/fluent-bit_loki_out-structured_metadata_map.yaml:/etc/fluent-bit_loki_out-structured_metadata_map.yaml
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    depends_on:
+      - loki
+      - fluentbit
+    ports:
+      - 3000:3000
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - logging-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  loki:
+    image: grafana/loki:2.9.2
+    command: -config.file=/etc/loki/loki-config.yaml
+    networks:
+      - logging-network
+    ports:
+      - 3100:3100
+    volumes:
+      - ./config/loki-config.yaml:/etc/loki/loki-config.yaml
+
+  # OpenSearch and OpenSearch Dashboards services
+  opensearch-node: # This is also the hostname of the container within the Docker network (i.e. https://opensearch-node/)
+    image: opensearchproject/opensearch:latest # Specifying the latest available image - modify if you want a specific version
+    container_name: opensearch-node
+    environment:
+      - cluster.name=opensearch-cluster # Name the cluster
+      - node.name=opensearch-node # Name the node that will run in this container
+      # - discovery.type=single-node # Use single-node discovery for a single-node cluster
+      - discovery.seed_hosts=opensearch-node # Nodes to look for when discovering the cluster
+      - cluster.initial_cluster_manager_nodes=opensearch-node # Nodes eligible to serve as cluster manager
+      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set min and max JVM heap sizes to at least 50% of system RAM
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=Contrast@123!"    # Sets the demo admin user password when using demo configuration, required for OpenSearch 2.12 and later
+      # - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevents execution of bundled demo script which installs demo certificates and security configurations to OpenSearch
+      # - "DISABLE_SECURITY_PLUGIN=true" # Disables Security plugin
+    ulimits:
+      memlock:
+        soft: -1 # Set memlock to unlimited (no soft or hard limit)
+        hard: -1
+      nofile:
+        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data # Creates volume called opensearch-data and mounts it to the container
+    ports:
+      - 9200:9200 # REST API
+      - 9600:9600 # Performance Analyzer
+    networks:
+      - logging-network # All of the containers will join the same Docker bridge network
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
+    container_name: opensearch-dashboards
+    # volumes: 
+      # - ./config/opensearch/opensearch-dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
+    ports:
+      - 5601:5601 # Map host port 5601 to container port 5601
+    expose:
+      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+    environment:
+      - 'OPENSEARCH_HOSTS=["https://opensearch-node:9200"]' # Define the OpenSearch nodes that OpenSearch Dashboards will query
+      # - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true" # disables security dashboards plugin in OpenSearch Dashboards
+      - "SERVER_HOST=0.0.0.0"
+      - OPENSEARCH_SSL_VERIFICATIONMODE=none
+
+    networks:
+      - logging-network
+
+  init:
+    image: curlimages/curl
+    container_name: init
+    entrypoint:
+      - /bin/sh
+      - '-c'
+      - |
+          URL=http://opensearch-dashboards:5601
+    
+          until curl --insecure -s -o /dev/null -w "%{http_code}" $$URL | grep -q "302"; do \
+              echo "Waiting for OpenSearch..."; \
+              sleep 2; \
+          done
+          curl --insecure -X POST -H "Content-Type: multipart/form-data" -H "osd-xsrf: osd-fetch" "$$URL/api/saved_objects/_import?overwrite=true" -u admin:Contrast@123! --form file='@/tmp/opensearch_savedobjects.ndjson'
+          curl --insecure -X POST -H 'Content-Type: application/json' -H 'osd-xsrf: osd-fetch' "$$URL/api/opensearch-dashboards/settings" -u admin:Contrast@123! --data-raw '{"changes":{"defaultRoute":"/app/dashboards#/"}}'
+          echo "OpenSearch Dashboards is ready!"
+    # status_code=$$(curl --write-out %{http_code} --silent --output /dev/null $$URL/app/home)
+    # echo $$status_code
+    # sleep 2
+    # while [ $$status_code -ne 200 ]
+    # do
+    #   status_code=$$(curl --write-out %{http_code} --silent --output /dev/null $$URL/app/home)
+    #   echo $$status_code
+    #   sleep 2
+    # done
+    # cat > /tmp/indexpattern.json << HERE
+    # {
+    #   "attributes": {
+    #     "title": "ecs-*",
+    #     "timeFieldName": "@timestamp"
+    #   }
+    # }
+    # HERE
+    # curl --silent -H "osd-xsrf: true" \
+    #   -H "Content-Type: application/json" \
+    #   -H "securitytenant: Global" \
+    #   -d "@/tmp/indexpattern.json" \
+    #   "$URL/api/saved_objects/index-pattern/ecs-*"
+    # echo 'index pattern imported'
+    volumes: 
+      - ./config/opensearch/opensearch_savedobjects.ndjson:/tmp/opensearch_savedobjects.ndjson
+    networks:
+      - logging-network
+    depends_on:
+    - opensearch-node
+    - opensearch-dashboards
+
+volumes:
+  opensearch-data:
+
+networks:
+  logging-network:

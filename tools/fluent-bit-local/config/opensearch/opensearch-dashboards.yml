@@ -1,0 +1,6 @@
+# server.host: 0.0.0.0
+# opensearch.hosts: ["https://opensearch-node:9200"]
+# opensearch.ssl.verificationMode: none
+opensearch.username: admin
+opensearch.password: Contrast@123!
+opensearch_security.multitenancy.enabled: false

@@ -1,0 +1,6 @@
+dependencies:
+- name: contrast-agent-operator
+  repository: https://contrastsecurity.dev/helm-charts
+  version: 5.0.0
+digest: sha256:4caa9410f008796289930630ba0bcf15add573385a7ffb48eb323324e378bb7d
+generated: "2025-09-18T01:01:27.183352+01:00"

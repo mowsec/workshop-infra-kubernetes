@@ -1,0 +1,25 @@
+
+falco:
+  json_output: "true"
+  loglevel: "debug"
+  json_include_output_property: "true"
+  json_include_tags_property: "true"
+
+tty: true
+
+falcoctl:
+  env:
+    - name: FALCOCTL_ARTIFACT_NOVERIFY
+      value: "true"
+
+collectors:
+  kubernetes:
+    enabled: true
+
+serviceAccount:
+  create: true
+rbac:
+  create: true
+
+webui:
+  enabled: enabled
