@@ -66,9 +66,6 @@ deploy-observability-stack: download-helm-dependencies
 	sleep 5;
 	echo "OpenSearch setup complete."
 
-setup-kube: deploy-observability-stack deploy-contrast
-	@echo "\nSetting up Cluster monitoring and Contrast Agent Operator..."
-
 
 print-deployment:
 	echo "\n\nInfrastructure deployment complete!"
@@ -85,6 +82,9 @@ print-deployment:
 	echo "  Username: admin"
 	echo "  Password: Contrast@123!"
 	echo ""
+
+setup-kube: deploy-observability-stack deploy-contrast print-deployment
+	@echo "\nSetting up Cluster monitoring and Contrast Agent Operator..."
 
 uninstall:
 	@echo "\nUninstalling Contrast Agent Operator and related components..."
