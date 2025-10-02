@@ -7,8 +7,40 @@ endif
 
 # Set the TLD for DNS resolution in Kubernetes, or set to localhost for local docker
 # TLD=localhost
-TLD=workshop.contrastdemo.com
+TLD=workshop1.contrastdemo.com
 
+
+# ONE TIME SETUP TASKS - only do this once after deploying the cluster!
+deploy-nginx:
+	@echo "\nPlease only do this once!\n\nSetting up NGINX Ingress Controller...\n"
+	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+	--namespace kube-system --create-namespace -f 2-nginx-ingress/values-nginx.yaml
+
+	@echo "Fetching ALB URL..."
+	$(eval ALB_URL:=$(shell kubectl get --namespace kube-system service/ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'))
+	@echo "\nUse the URL ${ALB_URL} to access the application."
+
+# ONE TIME SETUP TASKS - only do this once after deploying the cluster!
+configure-dns:
+	@echo "\nPlease only do this once!\n"
+	@echo "Fetching ALB URL..."
+	$(eval ALB_URL:=$(shell kubectl get --namespace kube-system service/ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'))
+	@echo "\nUse the URL ${ALB_URL} to access the application."
+	@echo ""
+	@echo "\nConfiguring DNS for rules for the cluster..."
+	aws route53 change-resource-record-sets \
+    	--hosted-zone-id /hostedzone/Z26P9SNXLR6Z7J \
+    	--change-batch \
+     '{"Changes": [ { "Action": "UPSERT", "ResourceRecordSet": { "Name": "${TLD}", "Type": "A", "AliasTarget":{ "HostedZoneId": "Z2IFOLAFXWLO4F","DNSName": "${ALB_URL}","EvaluateTargetHealth": true} } } ]}'
+	aws route53 change-resource-record-sets \
+    	--hosted-zone-id /hostedzone/Z26P9SNXLR6Z7J \
+    	--change-batch \
+	'{"Changes":[{"Action":"CREATE","ResourceRecordSet":{"Name":"*.${TLD}","Type":"CNAME","TTL":300,"ResourceRecords":[{"Value":"${TLD}"}]}}]}'
+	@echo "Note: It may take a few minutes for the DNS changes to propagate."
+	@echo "Note: DNS records are not managed. Please manually delete the A and CNAME records when deleting the cluster"
+
+prepare-cluster: deploy-nginx configure-dns
 
 download-helm-dependencies:
 	@echo "Downloading Helm chart dependencies..."
@@ -42,11 +74,6 @@ deploy-contrast: download-helm-dependencies validate-env-vars
 	kubectl -n contrast-agent-operator create secret generic default-agent-connection-secret --from-literal=token=$(CONTRAST__AGENT__TOKEN)
 	echo ""
 
-deploy-nginx:
-	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-	--namespace kube-system --create-namespace -f 2-nginx-ingress/values-nginx.yaml
-
 deploy-observability-stack: download-helm-dependencies
 	@echo "\nDeploying Observability Stack..."
 	@echo "\nSetting up FluentBit and Falco..."
@@ -55,7 +82,6 @@ deploy-observability-stack: download-helm-dependencies
 	@echo ""
 	@echo "\nSetting up OpenSearch..."
 	sleep 10
-	kubectl apply -f ingress.yaml -n observability
 	@until curl --insecure -s -o /dev/null -w "%{http_code}" http://opensearch.$(TLD)/ | grep -q "302"; do \
         echo "Waiting for OpenSearch..."; \
         sleep 5; \
