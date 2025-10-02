@@ -8,3 +8,7 @@ eksctl-create-cluster: aws-sso-login
 	eksctl create cluster -f workshop-cluster.yaml
 
 create-cluster: eksctl-create-cluster
+
+delete-cluster:
+	@echo "Deleting EKS Cluster..."
+	eksctl delete cluster -f workshop-cluster.yaml
