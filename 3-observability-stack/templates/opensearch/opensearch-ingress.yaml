@@ -6,7 +6,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: opensearch.workshop.contrastdemo.com
+    - host: opensearch.{{ .Values.workshopBaseUrl}}
       http:
         paths:
           - path: /

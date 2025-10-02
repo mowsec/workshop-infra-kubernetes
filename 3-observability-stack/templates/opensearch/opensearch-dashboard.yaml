@@ -32,7 +32,7 @@ spec:
         name: dashboard
         env:
         - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
-          value: "Contrast@123!"
+          value: {{ .Values.opensearch.initialAdminPassword }}
         ports:
         - containerPort: 5601
           name: dashboard

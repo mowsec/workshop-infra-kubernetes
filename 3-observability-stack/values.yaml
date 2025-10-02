@@ -91,7 +91,6 @@ fluent-bit:
           HTTP_Listen  0.0.0.0
           HTTP_Port    2020
 
-
     inputs: |
       [INPUT]
           Name              tail
@@ -113,8 +112,13 @@ fluent-bit:
           Read_From_Head    On
           Parser            cri
           Tag               edr
-
+    
     filters: |
+      [FILTER]
+          Name   grep
+          Match  adr
+          Regex  message incident_id
+
       [FILTER]
           Name        parser
           Match       adr
@@ -122,14 +126,22 @@ fluent-bit:
           Parser      json_no_ts
           Reserve_Data Off
 
-      [FILTER]
-          name       expect
-          match      adr
-          key_exists incident_id
+      #[FILTER]
+      #    name       expect
+      #    match      adr
+      #    key_exists incident_id
+      #    action     exit
 
       [FILTER]
           Name        parser
           Match       modsec
+          Key_Name    message
+          Parser      json_no_ts
+          Reserve_Data Off
+
+      [FILTER]
+          Name        parser
+          Match       edr
           Key_Name    message
           Parser      json_no_ts
           Reserve_Data Off
@@ -148,6 +160,17 @@ fluent-bit:
           Remove timestamp
 
       [FILTER]
+          Name          nest
+          Match         edr
+          Operation     lift
+          Nested_under  output_fields
+
+      [FILTER]
+          Name   modify
+          Match  edr
+          Copy   k8s.ns.name ns
+
+      [FILTER]
           Name   lua
           Match  modsec
           script /fluent-bit/scripts/modsec_ns.lua
@@ -162,12 +185,12 @@ fluent-bit:
           Name   modify
           Match  adr
           Add    service ADR
-      
+
       [FILTER]
           Name   modify
           Match  edr
           Add    service EDR
-      
+
     outputs: |
       [OUTPUT]
           Name                 es
@@ -184,12 +207,6 @@ fluent-bit:
           Replace_Dots         On
           Suppress_Type_Name   On
           Retry_Limit          False
-      
-      [OUTPUT]
-          Name                 stdout
-          Match_Regex ^(edr)$
-          Format              json
-
 
     customParsers: |
       [PARSER]
