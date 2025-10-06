@@ -10,7 +10,7 @@ contrast-agent-operator:
 
   imageCredentials:
     # Name of the registry credential secret that should be used to pull the above image.
-    pullSecretName: image-credentials
+    pullSecretName: docker-image-pull-secret
     # If enabled, a registry credential secret will be created using the above name and below credentials.
     enabled: false
     registry: contrast
@@ -22,7 +22,7 @@ contrast-agent-operator:
     # If enabled, deploy the operator. Disable if you want to deploy only configuration resources (injectors, cluster defaults).
     enabled: true
     # The default registry to use, defaults to docker.io/contrast.
-    defaultRegistry: contrast
+    # defaultRegistry: 771960604435.dkr.ecr.eu-west-1.amazonaws.com/dockerhub-images/contrast
     # The settle duration in seconds.
     # The time to wait to sync with the cluster before making changes.
     settleDuration: 10
@@ -126,10 +126,10 @@ contrast-agent-operator:
           #images:
           #  - imagename
         # Optional image configuration.
-        # image:
-        #   registry: docker.io/contrast
+        image:
+          # registry: 771960604435.dkr.ecr.eu-west-1.amazonaws.com/dockerhub-images/contrast
+          pullPolicy: IfNotPresent
         #   name: agent-java
-        #   pullPolicy: Always
         # Optional image version, defaults to latest
         #imageVersion: 5
         # Optional name of an AgentConfiguration to use with this injector
@@ -143,12 +143,18 @@ contrast-agent-operator:
           labels:
             - name: contrast-agent
               value: dotnet-core
+        image:
+          # registry: 771960604435.dkr.ecr.eu-west-1.amazonaws.com/dockerhub-images/contrast
+          pullPolicy: IfNotPresent
       - language: nodejs
         name: contrast-nodejs-injector
         selector:
           labels:
             - name: contrast-agent
               value: nodejs
+        image:
+          # registry: 771960604435.dkr.ecr.eu-west-1.amazonaws.com/dockerhub-images/contrast
+          pullPolicy: IfNotPresent
       - language: php
         name: contrast-php-injector
         selector:
@@ -161,10 +167,16 @@ contrast-agent-operator:
           labels:
             - name: contrast-agent
               value: python
+        image:
+          # registry: 771960604435.dkr.ecr.eu-west-1.amazonaws.com/dockerhub-images/contrast
+          pullPolicy: IfNotPresent
       - language: flex
         name: contrast-flex-injector
         selector:
           labels:
             - name: contrast-agent
               value: flex
+        image:
+          # registry: 771960604435.dkr.ecr.eu-west-1.amazonaws.com/dockerhub-images/contrast
+          pullPolicy: IfNotPresent
 

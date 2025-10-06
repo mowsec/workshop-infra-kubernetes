@@ -7,7 +7,7 @@ endif
 
 # Set the TLD for DNS resolution in Kubernetes, or set to localhost for local docker
 # TLD=localhost
-TLD=workshop1.contrastdemo.com
+TLD=workshop.contrastdemo.com
 
 
 # ONE TIME SETUP TASKS - only do this once after deploying the cluster!
