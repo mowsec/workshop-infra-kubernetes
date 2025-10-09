@@ -64,6 +64,9 @@ validate-env-vars:
 	@if [ -z "$(CONTRAST__API__AUTHORIZATION)" ]; then \
 		echo "Warning: CONTRAST__API__AUTHORIZATION is not set in .env file (optional for ADR data fetching and delete functionality)"; \
 	fi
+	@if [ -z "$(DEPLOYER_API_KEY)" ]; then \
+		echo "Warning: DEPLOYER_API_KEY is not set in .env file (the deployer won't be available)"; \
+	fi
 	@echo "Required environment variables are set."
 
 deploy-contrast: download-helm-dependencies validate-env-vars
@@ -92,6 +95,17 @@ deploy-observability-stack: download-helm-dependencies
 	sleep 5;
 	echo "OpenSearch setup complete."
 
+deploy-workshop-deployer:
+	@if [ -n "$(DEPLOYER_API_KEY)" ]; then \
+		echo "\nDeploying Workshop Deployer..."; \
+		helm upgrade --install workshop-deployer 5-workshop-deployer/k8s \
+		--namespace setup \
+		--create-namespace \
+		--set secret.apiKey="$(DEPLOYER_API_KEY)" \
+		--set ingress.host="setup.$(TLD)"; \
+		kubectl -n setup create secret generic contrast-agent-secret --from-literal=token=$(CONTRAST__AGENT__TOKEN) --dry-run=client -o yaml |kubectl apply -f -; \
+		kubectl -n setup create secret generic contrast-api-secret --from-literal=api_key=$(CONTRAST__API__KEY) --from-literal=auth_header=$(CONTRAST__API__AUTHORIZATION) --dry-run=client -o yaml |kubectl apply -f -; \
+	fi
 
 print-deployment:
 	echo "\n\nInfrastructure deployment complete!"
@@ -109,7 +123,7 @@ print-deployment:
 	echo "  Password: Contrast@123!"
 	echo ""
 
-setup-kube: deploy-observability-stack deploy-contrast print-deployment
+setup-kube: deploy-observability-stack deploy-contrast deploy-workshop-deployer print-deployment
 	@echo "\nSetting up Cluster monitoring and Contrast Agent Operator..."
 
 uninstall:
